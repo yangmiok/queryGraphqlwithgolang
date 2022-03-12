@@ -1,0 +1,68 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
+)
+
+func main() {
+
+	type requestTransactions struct {
+		Data struct {
+			SubstrateEvent []struct {
+				BlockNumber int    `json:"blockNumber"`
+				BlockID     string `json:"blockId"`
+				CreatedAt   string `json:"created_at"`
+				Data        struct {
+					Param0 struct {
+						Type  string `json:"type"`
+						Value string `json:"value"`
+					} `json:"param0"`
+					Param1 struct {
+						Type  string `json:"type"`
+						Value string `json:"value"`
+					} `json:"param1"`
+					Param2 struct {
+						Type  string      `json:"type"`
+						Value interface{} `json:"value"`
+					} `json:"param2"`
+				} `json:"data"`
+			} `json:"substrate_event"`
+		} `json:"data"`
+	}
+
+	jsonData := map[string]string{
+		"query": `
+            { 
+                substrate_event(where: {name: {_eq: "balances.Transfer"}}, order_by: {blockNumber: desc}) {
+                blockNumber
+                blockId
+                created_at
+                data
+                }
+            }
+        `,
+	}
+	jsonValue, _ := json.Marshal(jsonData)
+	request, err := http.NewRequest("POST", "http://123.251.101.31:16001/v1/graphql", bytes.NewBuffer(jsonValue))
+	client := &http.Client{Timeout: time.Second * 10}
+	response, err := client.Do(request)
+	defer response.Body.Close()
+	if err != nil {
+		fmt.Printf("The HTTP request failed with error %s\n", err)
+	}
+	repsdata, _ := ioutil.ReadAll(response.Body)
+	//fmt.Println(string(repsdata))
+	var transactionsRespone requestTransactions
+	err = json.Unmarshal(repsdata, &transactionsRespone)
+	if err != nil {
+		fmt.Println("解析数据失败", err)
+		return
+	}
+	fmt.Print(len(transactionsRespone.Data.SubstrateEvent))
+
+}
