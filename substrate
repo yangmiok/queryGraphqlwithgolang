@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 )
 
+func interface2String(inter interface{}) {
+
+}
 func main() {
 
 	type requestTransactions struct {
@@ -48,7 +52,7 @@ func main() {
         `,
 	}
 	jsonValue, _ := json.Marshal(jsonData)
-	request, err := http.NewRequest("POST", "http://123.251.101.31:16001/v1/graphql", bytes.NewBuffer(jsonValue))
+	request, err := http.NewRequest("POST", "http://183.251.101.31:16001/v1/graphql", bytes.NewBuffer(jsonValue))
 	client := &http.Client{Timeout: time.Second * 10}
 	response, err := client.Do(request)
 	defer response.Body.Close()
@@ -63,6 +67,54 @@ func main() {
 		fmt.Println("解析数据失败", err)
 		return
 	}
-	fmt.Print(len(transactionsRespone.Data.SubstrateEvent))
+	//fmt.Print(len(transactionsRespone.Data.SubstrateEvent))
+
+	type Transactions struct {
+		From        string  `json:"from"`
+		To          string  `json:"to"`
+		Amount      float64 `json:"amount"`
+		BlockNumber int     `json:"blockNumber"`
+		CreatedAt   string  `json:"created_at"`
+	}
+	var arraydata = []Transactions{}
+
+	for i := 0; i < len(transactionsRespone.Data.SubstrateEvent); i++ {
+
+		if transactionsRespone.Data.SubstrateEvent[i].Data.Param0.Value == "mERcJhdm1ysmsxnFATjG5CbqhDqkYzbVr9cTezXGfZTpKj8sE" {
+			var t Transactions
+			//fmt.Println(transactionsRespone.Data.SubstrateEvent[i])
+			t.From = transactionsRespone.Data.SubstrateEvent[i].Data.Param0.Value
+			t.To = transactionsRespone.Data.SubstrateEvent[i].Data.Param1.Value
+			//************************************Amount****************************************
+			var amountNum float64
+			switch transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(type) {
+			case string:
+				//fmt.Println("string", transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(string))
+				hex := transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(string)
+				val := hex[2:]
+				n, err := strconv.ParseUint(val, 16, 64)
+				if err != nil {
+					panic(err)
+				}
+				amountNum = float64(n / 1000000000000000)
+				break
+			case int:
+				fmt.Println("int", transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(int))
+				break
+			case float64:
+				//fmt.Println("float64", transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(float64))
+				amountNum = float64(transactionsRespone.Data.SubstrateEvent[i].Data.Param2.Value.(float64) / 1000000000000000)
+				break
+			}
+			//************************************Amount****************************************
+
+			t.Amount = amountNum
+			t.BlockNumber = transactionsRespone.Data.SubstrateEvent[i].BlockNumber
+			t.CreatedAt = transactionsRespone.Data.SubstrateEvent[i].CreatedAt
+			arraydata = append(arraydata, t)
+		}
+	}
+
+	fmt.Println(arraydata)
 
 }
